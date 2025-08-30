@@ -68,6 +68,7 @@ class Interceptor {
     mv = [0, 4];              // Velocity vector of the missile (constant)
     mp0 = [0, 0];             // Initial position of the missile (constant)
     color = "lime";
+    vector_color = "magenta";
     font = "16px monospace";
 
     constructor(canvas, inputEl, buttonEl) {
@@ -99,7 +100,7 @@ class Interceptor {
         this.tv0 = [0, 0]; // Target initial velocity
 
         // Randomly select target velocity and a valid solution
-        while (this.tp0[1] <= 0 || this.tv0[0] === 0) {
+        while (this.tp0[1] <= 5 || this.tv0[0] === 0) {
             this.tv0 = [this.randInt(...this.tv_range), this.randInt(...this.tv_range)];
             this.sol = [this.randInt(...this.sol_range), this.randInt(...this.sol_range)]; // [flight_time, launch_time]
             
@@ -403,7 +404,7 @@ class Interceptor {
     drawVector(pos, vel) {
         const start = this.toCanvasCoords(pos[0], pos[1]);
         const end = this.toCanvasCoords(pos[0] + vel[0], pos[1] + vel[1]);
-        this.ctx.strokeStyle = this.color;
+        this.ctx.strokeStyle = this.vector_color;
         this.ctx.lineWidth = 1;
         this.ctx.beginPath();
         this.ctx.moveTo(start[0], start[1]);
