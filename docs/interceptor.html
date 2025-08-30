@@ -58,6 +58,7 @@
         <label for="launchTimeInput">Select missile launch time: </label>
         <input type="text" id="launchTimeInput" maxlength="4">
         <button id="launchButton">LAUNCH</button>
+        <button id="resetButton">RESET</button>
     </div>
 
 <script>
@@ -71,11 +72,12 @@ class Interceptor {
     vector_color = "magenta";
     font = "16px monospace";
 
-    constructor(canvas, inputEl, buttonEl) {
+    constructor(canvas, inputEl, buttonEl, resetEl) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.inputEl = inputEl;
         this.buttonEl = buttonEl;
+        this.resetEl = resetEl;
 
         this.setupEventListeners();
         this.resetGame();
@@ -137,6 +139,7 @@ class Interceptor {
         this.prepareSummaryText();
         this.inputEl.disabled = false;
         this.buttonEl.disabled = false;
+        this.resetEl.disabled = false;
         this.inputEl.value = '';
     }
     
@@ -157,6 +160,7 @@ class Interceptor {
 
     setupEventListeners() {
         this.buttonEl.addEventListener('click', this.missileLaunch.bind(this));
+        this.resetEl.addEventListener('click', this.resetGame.bind(this));
         this.inputEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') this.missileLaunch();
         });
@@ -308,7 +312,7 @@ class Interceptor {
         } else if(this.gameOver) {
             dynamicText = this.gameOverText;
         } else if (!this.launched) {
-            dynamicText = `time: ${this.t.toFixed(2)}\ntarget distance: ${this.dist.toFixed(2)}\nAWAITING LAUNCH COMMAND`;
+            dynamicText = `time: ${this.t.toFixed(2)}\ntarget distance: ${this.dist.toFixed(2)}\nAWAITING LAUNCH ORDER`;
         } else if (!this.fired) {
             dynamicText = `time: ${this.t.toFixed(2)}\ntarget distance: ${this.dist.toFixed(2)}\nmissile launch in ${(this.t0 - this.t).toFixed(2)}`;
         } else {
@@ -418,7 +422,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('gameCanvas');
     const launchInput = document.getElementById('launchTimeInput');
     const launchButton = document.getElementById('launchButton');
-    new Interceptor(canvas, launchInput, launchButton);
+    const resetButton = document.getElementById('resetButton');
+    new Interceptor(canvas, launchInput, launchButton, resetButton);
 });
 
 </script>
