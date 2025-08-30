@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Interceptor Game - JavaScript Version</title>
+    <style>
+        body {
+            background-color: black;
+            color: lime;
+            font-family: monospace;
+            text-align: center;
+            margin: 0;
+            padding-top: 20px;
+        }
+        canvas {
+            background-color: black;
+            border: 1px solid lime;
+            display: block;
+            margin: 20px auto;
+        }
+        #controls {
+            font-size: 1.1em;
+        }
+        input {
+            background-color: black;
+            color: lime;
+            border: 1px solid lime;
+            font-family: monospace;
+            font-size: 1em;
+            width: 50px;
+            padding: 3px 8px;
+            text-align: center;
+        }
+        button {
+            background-color: black;
+            color: lime;
+            border: 1px solid lime;
+            font-family: monospace;
+            font-size: 1em;
+            cursor: pointer;
+            padding: 3px 8px;
+        }
+        button:hover {
+            background-color: lime;
+            color: black;
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 MTH 309 Missile Command 🚀</h1>
+    <canvas id="gameCanvas" width="600" height="600"></canvas>
+    <div id="controls">
+        <label for="launchTimeInput">Select missile launch time: </label>
+        <input type="text" id="launchTimeInput" maxlength="4">
+        <button id="launchButton">LAUNCH</button>
+    </div>
+
+<script>
+class Interceptor {
+    // --- Static Game Configuration ---
+    sol_range = [1, 15];      // Range of possible solutions
+    tv_range = [1, 30];       // Range of target velocity vector coordinates
+    mv = [0, 4];              // Velocity vector of the missile (constant)
+    mp0 = [0, 0];             // Initial position of the missile (constant)
+    color = "lime";
+    font = "16px monospace";
+
+    constructor(canvas, inputEl, buttonEl) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.inputEl = inputEl;
+        this.buttonEl = buttonEl;
+
+        this.setupEventListeners();
+        this.resetGame();
+        
+        // Start the animation loop
+        this.lastTime = 0;
+        requestAnimationFrame(this.gameLoop.bind(this));
+    }
+    
+    // --- Vector Math Helpers ---
+    vecAdd(v1, v2) { return [v1[0] + v2[0], v1[1] + v2[1]]; }
+    vecSub(v1, v2) { return [v1[0] - v2[0], v1[1] - v2[1]]; }
+    vecScale(v, s) { return [v[0] * s, v[1] * s]; }
+    vecNorm(v) { return Math.sqrt(v[0]**2 + v[1]**2); }
+    randInt(min, max) { return Math.floor(Math.random() * (max - min) + min); }
+
+    /**
+     * Sets up a new game scenario. This corresponds to the Python __init__ method.
+     */
+    resetGame() {
+        this.tp0 = [0, 0]; // Target initial position
+        this.tv0 = [0, 0]; // Target initial velocity
+
+        // Randomly select target velocity and a valid solution
+        while (this.tp0[1] <= 0 || this.tv0[0] === 0) {
+            this.tv0 = [this.randInt(...this.tv_range), this.randInt(...this.tv_range)];
+            this.sol = [this.randInt(...this.sol_range), this.randInt(...this.sol_range)]; // [flight_time, launch_time]
+            
+            // Calculate the required initial target position for an intercept to be possible
+            // Equation: mp0 + sol[0]*mv = tp0 + (sol[0]+sol[1])*tv0  => rearranged for tp0
+            const term1 = this.vecScale(this.mv, this.sol[0]);
+            const term2 = this.vecScale(this.tv0, this.sol[0] + this.sol[1]);
+            this.tp0 = this.vecSub(term1, term2).map(n => parseFloat(n.toFixed(2)));
+        }
+
+        this.code = Math.floor(this.tp0[0] + this.tp0[1] + this.tv0[0] + this.tv0[1]) % 31;
+
+        // --- Set Plot Boundaries ---
+        this.xmax = Math.abs(this.tp0[0]) + 10;
+        this.xmin = -1 * Math.abs(this.tp0[0]) - 10;
+        this.ymax = Math.max(Math.abs(this.tp0[1]), this.sol[0] * this.mv[1]) + 15;
+        this.ymin = -1;
+
+        // --- Initialize Dynamic Game State ---
+        this.tp = [...this.tp0]; // Target position
+        this.tv = [...this.tv0]; // Target velocity
+        this.mp = [...this.mp0]; // Missile position
+        
+        this.launched = false; // Has the user submitted a launch time?
+        this.fired = false;    // Has the missile left the launcher?
+        this.hit = false;      // Has the target been intercepted?
+        this.gameOver = false; // Is the scenario over?
+        this.gameOverText = '';
+        this.particles = [];
+        this.dist = this.vecNorm(this.vecSub(this.tp, this.mp));
+        this.t = 0;            // Elapsed game time
+        this.t0 = 0;           // User-submitted launch time
+        
+        this.prepareSummaryText();
+        this.inputEl.disabled = false;
+        this.buttonEl.disabled = false;
+        this.inputEl.value = '';
+    }
+    
+    /**
+     * Handles the user submitting a launch time.
+     */
+    missileLaunch() {
+        const val = parseFloat(this.inputEl.value);
+        if (!isNaN(val)) {
+            this.t0 = val;
+            this.launched = true;
+            this.inputEl.disabled = true;
+            this.buttonEl.disabled = true;
+        } else {
+            this.inputEl.value = "";
+        }
+    }
+
+    setupEventListeners() {
+        this.buttonEl.addEventListener('click', this.missileLaunch.bind(this));
+        this.inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this.missileLaunch();
+        });
+    }
+
+    /**
+     * The main game loop, called for each animation frame.
+     */
+    gameLoop(timestamp) {
+        if (!this.lastTime) this.lastTime = timestamp;
+        const deltaTime = (timestamp - this.lastTime) / 1000; // Time elapsed in seconds
+        this.lastTime = timestamp;
+
+        this.update(deltaTime);
+        this.draw();
+
+        requestAnimationFrame(this.gameLoop.bind(this));
+    }
+
+    /**
+     * Updates the game state for the current frame.
+     */
+    update(dt) {
+        if (!this.launched) return;
+
+        this.t += dt;
+
+        if (!this.hit) {
+            // Update target position
+            this.tp = this.vecAdd(this.tp, this.vecScale(this.tv, dt));
+
+            if (this.t > this.t0) {
+                if (!this.fired) {
+                    this.mp[1] -= 0.5; // Small aesthetic back-jump before launch
+                    this.fired = true;
+                } else {
+                    this.mp = this.vecAdd(this.mp, this.vecScale(this.mv, dt));
+                }
+
+                // Check for a miss condition
+                if (this.tp[0] > 2 || this.mp[1] > this.tp[1] + 2) {
+                    this.gameOverText = `time: ${this.t.toFixed(2)}\nTARGET LOST`;
+                    this.gameOver = true;
+                }
+            }
+            this.dist = this.vecNorm(this.vecSub(this.tp, this.mp));
+
+            // Check for a successful hit
+            if (this.t0 === this.sol[1] && this.t >= (this.sol[0] + this.sol[1])) {
+                this.hit = true;
+                this.mp[1] += 0.5; // Final position adjustment
+                this.initExplosion();
+            }
+        } else {
+            // Update explosion animation
+            this.updateExplosion(dt);
+            if (this.particles.every(p => p.alpha <= 0)) {
+                 return;
+            }
+        }
+    }
+
+    /**
+     * Initializes the particle explosion on a successful hit.
+     */
+    initExplosion() {
+        const N = 100; // Number of particles
+        const spread = [0.02 * this.xmax, 0.02 * this.ymax];
+        for (let i = 0; i < N; i++) {
+            this.particles.push({
+                pos: [...this.tp],
+                vel: [(Math.random() - 0.5) * spread[0] * 5, (Math.random() - 0.5) * spread[1] * 5],
+                alpha: 1.0,
+                size: 1.5 + Math.random()
+            });
+        }
+    }
+    
+    /**
+     * Updates particle positions and opacity for the explosion effect.
+     */
+    updateExplosion(dt) {
+        const fallRate = [0, -0.003 * this.ymax];
+        const brightnessDecay = 0.98;
+
+        this.particles.forEach(p => {
+            p.pos = this.vecAdd(p.pos, this.vecScale(p.vel, dt));
+            p.vel = this.vecAdd(p.vel, this.vecScale(fallRate, dt * 100)); // Gravity effect
+            p.alpha *= brightnessDecay;
+            if (p.alpha < 0) p.alpha = 0;
+        });
+    }
+
+    /**
+     * Renders all game objects to the canvas.
+     */
+    draw() {
+        const ctx = this.ctx;
+        // Clear canvas
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.drawGrid();
+
+        // Draw game elements unless hit has occurred
+        if (!this.hit) {
+            // Draw Target
+            this.drawMarker(this.tp[0], this.tp[1], '+', 30);
+            // Draw Missile
+            this.drawMarker(this.mp[0], this.mp[1], '^', 20);
+            
+            // Draw velocity vectors only before launch
+            if (!this.launched) {
+                this.drawVector(this.tp, this.tv);
+                this.drawVector(this.mp, this.mv);
+            }
+        } else {
+            this.drawExplosion();
+        }
+        
+        this.drawText();
+    }
+    
+    /**
+     * Draws text information on the screen.
+     */
+    drawText() {
+        this.ctx.fillStyle = this.color;
+        this.ctx.font = this.font;
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'top';
+
+        // Initial Data
+        const textLines = [
+            `target position         = [${this.tp0[0].toFixed(0).toString().padStart(4)}, ${this.tp0[1].toFixed(0).toString().padStart(4)}]`,
+            `target velocity vector  = [${this.tv0[0].toString().padStart(4)}, ${this.tv0[1].toString().padStart(4)}]`,
+            `---------------------------------------`,
+            `missile position        = [${this.mp0[0].toString().padStart(4)}, ${this.mp0[1].toString().padStart(4)}]`,
+            `missile velocity vector = [${this.mv[0].toString().padStart(4)}, ${this.mv[1].toString().padStart(4)}]`
+        ];
+        textLines.forEach((line, i) => this.ctx.fillText(line, 20, 20 + i * 20));
+
+        // Dynamic Text
+        let dynamicText = '';
+        if (this.hit) {
+            const timeSinceHit = this.t - (this.sol[0] + this.sol[1]);
+            const charsToShow = Math.floor(timeSinceHit / 0.04);
+            dynamicText = this.summaryText.substring(0, charsToShow);
+        } else if(this.gameOver) {
+            dynamicText = this.gameOverText;
+        } else if (!this.launched) {
+            dynamicText = `time: ${this.t.toFixed(2)}\ntarget distance: ${this.dist.toFixed(2)}\nAWAITING LAUNCH COMMAND`;
+        } else if (!this.fired) {
+            dynamicText = `time: ${this.t.toFixed(2)}\ntarget distance: ${this.dist.toFixed(2)}\nmissile launch in ${(this.t0 - this.t).toFixed(2)}`;
+        } else {
+            dynamicText = `time: ${this.t.toFixed(2)}\ntarget distance: ${this.dist.toFixed(2)}\nMISSILE EN ROUTE`;
+        }
+
+        this.ctx.textBaseline = 'bottom';
+        dynamicText.split('\n').forEach((line, i) => {
+            this.ctx.fillText(line, 20, this.canvas.height - 20 - (dynamicText.split('\n').length - 1 - i) * 20);
+        });
+    }
+
+    prepareSummaryText() {
+        const summary = [
+            'TARGET INTERCEPTED',
+            'MISSION SUMMARY:',
+            '----------------------------------------',
+            `initial target position  = [${this.tp0[0].toFixed(0).toString().padStart(4)}, ${this.tp0[1].toFixed(0).toString().padStart(4)}]`,
+            `target velocity vector   = [${this.tv0[0].toString().padStart(4)}, ${this.tv0[1].toString().padStart(4)}]`,
+            '----------------------------------------',
+            `missile launch time      = ${this.sol[1].toString().padStart(2)} seconds`,
+            '----------------------------------------',
+            `control code             = ${this.code.toString().padStart(2)}`,
+            '----------------------------------------',
+            'THE END'
+        ];
+        this.summaryText = summary.join('\n');
+    }
+
+    drawExplosion() {
+        this.particles.forEach(p => {
+            this.ctx.fillStyle = `rgba(0, 255, 0, ${p.alpha})`;
+            const [cx, cy] = this.toCanvasCoords(p.pos[0], p.pos[1]);
+            this.ctx.beginPath();
+            this.ctx.arc(cx, cy, p.size, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+    }
+
+    /**
+     * Converts game coordinates to canvas pixel coordinates.
+     */
+    toCanvasCoords(x, y) {
+        const gameWidth = this.xmax - this.xmin;
+        const gameHeight = this.ymax - this.ymin;
+        const canvasX = ((x - this.xmin) / gameWidth) * this.canvas.width;
+        const canvasY = this.canvas.height - (((y - this.ymin) / gameHeight) * this.canvas.height);
+        return [canvasX, canvasY];
+    }
+
+    drawGrid() {
+        this.ctx.strokeStyle = this.color;
+        this.ctx.lineWidth = 0.2;
+        const stepX = (this.xmax - this.xmin) / 20;
+        for (let x = this.xmin; x <= this.xmax; x += stepX) {
+            const [cx1] = this.toCanvasCoords(x, this.ymin);
+            const [cx2] = this.toCanvasCoords(x, this.ymax);
+            this.ctx.beginPath();
+            this.ctx.moveTo(cx1, 0);
+            this.ctx.lineTo(cx2, this.canvas.height);
+            this.ctx.stroke();
+        }
+        const stepY = (this.ymax - this.ymin) / 20;
+        for (let y = this.ymin; y <= this.ymax; y += stepY) {
+            const [, cy1] = this.toCanvasCoords(this.xmin, y);
+            const [, cy2] = this.toCanvasCoords(this.xmax, y);
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, cy1);
+            this.ctx.lineTo(this.canvas.width, cy2);
+            this.ctx.stroke();
+        }
+    }
+
+    drawMarker(x, y, char, size) {
+        const [cx, cy] = this.toCanvasCoords(x, y);
+        this.ctx.strokeStyle = this.color;
+        this.ctx.lineWidth = 1.5;
+        this.ctx.font = `${size}px monospace`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        if (char === '+') {
+            this.ctx.strokeText('+', cx, cy);
+        } else if (char === '^') {
+            this.ctx.beginPath();
+            this.ctx.moveTo(cx, cy - size / 2);
+            this.ctx.lineTo(cx - size / 2, cy + size / 2);
+            this.ctx.lineTo(cx + size / 2, cy + size / 2);
+            this.ctx.closePath();
+            this.ctx.stroke();
+        }
+    }
+
+    drawVector(pos, vel) {
+        const start = this.toCanvasCoords(pos[0], pos[1]);
+        const end = this.toCanvasCoords(pos[0] + vel[0], pos[1] + vel[1]);
+        this.ctx.strokeStyle = this.color;
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        this.ctx.moveTo(start[0], start[1]);
+        this.ctx.lineTo(end[0], end[1]);
+        this.ctx.stroke();
+    }
+}
+
+// --- Start the game when the page loads ---
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('gameCanvas');
+    const launchInput = document.getElementById('launchTimeInput');
+    const launchButton = document.getElementById('launchButton');
+    new Interceptor(canvas, launchInput, launchButton);
+});
+
+</script>
+</body>
+</html>
