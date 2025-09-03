@@ -71,6 +71,8 @@ class Interceptor {
     color = "lime";
     vector_color = "magenta";
     font = "16px monospace";
+    target_size = 30;
+    missile_size = 20;
 
     constructor(canvas, inputEl, buttonEl, resetEl) {
         this.canvas = canvas;
@@ -118,8 +120,8 @@ class Interceptor {
         // --- Set Plot Boundaries ---
         this.xmax = Math.abs(this.tp0[0]) + 10;
         this.xmin = -1 * Math.abs(this.tp0[0]) - 10;
-        this.ymax = Math.max(Math.abs(this.tp0[1]), this.sol[0] * this.mv[1]) + 15;
-        this.ymin = -1;
+        this.ymax = Math.max(Math.abs(this.tp0[1]), this.sol[0] * this.mv[1]) + this.missile_size;
+        this.ymin = 0;
 
         // --- Initialize Dynamic Game State ---
         this.tp = [...this.tp0]; // Target position
@@ -268,9 +270,9 @@ class Interceptor {
         // Draw game elements unless hit has occurred
         if (!this.hit) {
             // Draw Target
-            this.drawMarker(this.tp[0], this.tp[1], '+', 30);
+            this.drawMarker(this.tp[0], this.tp[1], '+', this.target_size);
             // Draw Missile
-            this.drawMarker(this.mp[0], this.mp[1], '^', 20);
+            this.drawMarker(this.mp[0], this.mp[1], '^', this.missile_size);
             
             // Draw velocity vectors only before launch
             if (!this.launched) {
@@ -359,7 +361,7 @@ class Interceptor {
         const gameWidth = this.xmax - this.xmin;
         const gameHeight = this.ymax - this.ymin;
         const canvasX = ((x - this.xmin) / gameWidth) * this.canvas.width;
-        const canvasY = this.canvas.height - (((y - this.ymin) / gameHeight) * this.canvas.height);
+        const canvasY = this.canvas.height - (((y - this.ymin) / gameHeight) * this.canvas.height) - this.missile_size - 2;
         return [canvasX, canvasY];
     }
 
@@ -397,9 +399,9 @@ class Interceptor {
             this.ctx.strokeText('+', cx, cy);
         } else if (char === '^') {
             this.ctx.beginPath();
-            this.ctx.moveTo(cx, cy - size / 2);
-            this.ctx.lineTo(cx - size / 2, cy + size / 2);
-            this.ctx.lineTo(cx + size / 2, cy + size / 2);
+            this.ctx.moveTo(cx, cy);
+            this.ctx.lineTo(cx - size / 2, cy + size);
+            this.ctx.lineTo(cx + size / 2, cy + size);
             this.ctx.closePath();
             this.ctx.stroke();
         }
