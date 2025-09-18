@@ -10,7 +10,7 @@ from sympy import *
 from IPython.display import IFrame
 
 def show_pic(fname):
-    root = "https://bbadzioch.github.io/MTH309_S2025/house_transformations_pics/"
+    root = "https://bbadzioch.github.io/MTH309_F2025/house_transformations_pics/"
     suffix = ".html"
     width = 800
     height = 410
