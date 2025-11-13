@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTH 309 Course Grade Calculator</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter font family -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Apply Inter font as the default */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main calculator card -->
+    <div class="bg-white dark:bg-gray-800 w-full max-w-md p-8 rounded-xl shadow-2xl">
+        <h1 class="text-3xl font-bold text-center text-blue-600 dark:text-blue-400 mb-8">
+            MTH 309 Final Grade Calculator
+        </h1>
+        <div class="text-center mt-6 pt-6 mb-6 pb-6 border-b border-t border-gray-200 dark:border-gray-700">
+        <p>Lowest exam grade is worth 18% of the final grade, the other two exams are 33% each. Homework is 16%.</p>
+        </div>
+
+        <!-- Form inputs container -->
+        <div class="space-y-5">
+            <!-- Exam 1 -->
+            <div class="flex justify-between items-center">
+                <label for="exam1" class="text-lg font-semibold">Exam 1</label>
+                <select id="exam1" name="exam1" class="grade-select w-36 p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                    <!-- Options will be populated by JS -->
+                </select>
+            </div>
+
+            <!-- Exam 2 -->
+            <div class="flex justify-between items-center">
+                <label for="exam2" class="text-lg font-semibold">Exam 2</label>
+                <select id="exam2" name="exam2" class="grade-select w-36 p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                    <!-- Options will be populated by JS -->
+                </select>
+            </div>
+
+            <!-- Exam 3 -->
+            <div class="flex justify-between items-center">
+                <label for="exam3" class="text-lg font-semibold">Exam 3</label>
+                <select id="exam3" name="exam3" class="grade-select w-36 p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                    <!-- Options will be populated by JS -->
+                </select>
+            </div>
+
+            <!-- Homework -->
+            <div class="flex justify-between items-center">
+                <label for="homework" class="text-lg font-semibold">Homework</label>
+                <select id="homework" name="homework" class="grade-select w-36 p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                    <!-- Options will be populated by JS -->
+                </select>
+            </div>
+        </div>
+
+        <!-- Calculate Button -->
+        <button id="calculateBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg py-3 px-4 rounded-lg mt-8 transition-colors duration-200 shadow-md">
+            Calculate
+        </button>
+
+        <!-- Error Message -->
+        <p id="errorMsg" class="text-red-500 text-center mt-4 h-5"></p>
+
+        <!-- Result Display -->
+        <div class="text-center mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300">Final Course Grade</h2>
+            <p id="finalGrade" class="text-6xl font-bold text-gray-800 dark:text-gray-100 mt-2">-</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const gradeOptions = [
+                { letter: 'A', points: 4.0 },
+                { letter: 'A-', points: 3.67 },
+                { letter: 'B+', points: 3.33 },
+                { letter: 'B', points: 3.0 },
+                { letter: 'B-', points: 2.67 },
+                { letter: 'C+', points: 2.33 },
+                { letter: 'C', points: 2.0 },
+                { letter: 'C-', points: 1.67 },
+                { letter: 'D+', points: 1.33 },
+                { letter: 'D', points: 1.0 },
+                { letter: 'F', points: 0.0 }
+            ];
+
+            const gradeSelects = document.querySelectorAll('.grade-select');
+            const calculateBtn = document.getElementById('calculateBtn');
+            const finalGradeEl = document.getElementById('finalGrade');
+            const errorMsgEl = document.getElementById('errorMsg');
+
+            // --- 1. Populate Dropdowns ---
+            // Create the HTML string for the options
+            let optionsHtml = '<option value="" disabled selected>Select Grade</option>';
+            gradeOptions.forEach(grade => {
+                optionsHtml += `<option value="${grade.points}">${grade.letter}</option>`;
+            });
+
+            // Set the innerHTML for all select elements
+            gradeSelects.forEach(select => {
+                select.innerHTML = optionsHtml;
+            });
+
+            // --- 2. Add Click Event Listener ---
+            calculateBtn.addEventListener('click', () => {
+                // Clear previous errors and reset result
+                errorMsgEl.textContent = '';
+                finalGradeEl.textContent = '-';
+                finalGradeEl.className = 'text-6xl font-bold text-gray-800 dark:text-gray-100 mt-2'; // Reset color
+
+                // Get point values from inputs
+                const e1 = parseFloat(document.getElementById('exam1').value);
+                const e2 = parseFloat(document.getElementById('exam2').value);
+                const e3 = parseFloat(document.getElementById('exam3').value);
+                const hw = parseFloat(document.getElementById('homework').value);
+
+                // Validate inputs
+                if (isNaN(e1) || isNaN(e2) || isNaN(e3) || isNaN(hw)) {
+                    errorMsgEl.textContent = 'Please select a grade for all components.';
+                    return;
+                }
+
+                // --- 3. Perform Calculation ---
+                
+                // Find lowest, mid, and high exam scores
+                const exams = [e1, e2, e3];
+                exams.sort((a, b) => a - b); // Sorts ascending: [lowest, mid, high]
+                
+                const lowestExam = exams[0];
+                const midExam = exams[1];
+                const highExam = exams[2];
+
+                // Apply weights
+                const weightedTotal = (lowestExam * 0.18) + 
+                                      (midExam * 0.33) + 
+                                      (highExam * 0.33) + 
+                                      (hw * 0.16);
+
+                // --- 4. Convert Weighted Average to Letter Grade ---
+                const finalLetter = getNearestGrade(weightedTotal);
+
+                // --- 5. Display Result ---
+                finalGradeEl.textContent = finalLetter;
+
+                // Add color based on grade
+                let colorClass = 'text-red-500 dark:text-red-400'; // Default for F/D
+                if (weightedTotal >= 3.835) colorClass = 'text-green-600 dark:text-green-400'; // A
+                else if (weightedTotal >= 3.5) colorClass = 'text-green-500 dark:text-green-400'; // A-
+                else if (weightedTotal >= 2.835) colorClass = 'text-blue-600 dark:text-blue-400'; // B+, B
+                else if (weightedTotal >= 2.5) colorClass = 'text-blue-500 dark:text-blue-400'; // B-
+                else if (weightedTotal >= 1.835) colorClass = 'text-yellow-600 dark:text-yellow-400'; // C+, C
+                else if (weightedTotal >= 1.5) colorClass = 'text-yellow-500 dark:text-yellow-400'; // C-
+                else if (weightedTotal >= 0.5) colorClass = 'text-orange-500 dark:text-orange-400'; // D+, D
+                
+                finalGradeEl.className = `text-6xl font-bold mt-2 ${colorClass}`;
+            });
+
+            /**
+             * Converts a weighted grade point average to the nearest letter grade.
+             * It works by checking midpoints between grade point values.
+             * e.g., Midpoint between A (4.0) and A- (3.67) is 3.835.
+             * Anything >= 3.835 is an A.
+             */
+            function getNearestGrade(points) {
+                if (points >= 3.835) return 'A';
+                if (points >= 3.5) return 'A-';    // Midpoint (3.67 + 3.33) / 2
+                if (points >= 3.165) return 'B+';  // Midpoint (3.33 + 3.0) / 2
+                if (points >= 2.835) return 'B';   // Midpoint (3.0 + 2.67) / 2
+                if (points >= 2.5) return 'B-';    // Midpoint (2.67 + 2.33) / 2
+                if (points >= 2.165) return 'C+';  // Midpoint (2.33 + 2.0) / 2
+                if (points >= 1.835) return 'C';   // Midpoint (2.0 + 1.67) / 2
+                if (points >= 1.5) return 'C-';    // Midpoint (1.67 + 1.33) / 2
+                if (points >= 1.165) return 'D+';  // Midpoint (1.33 + 1.0) / 2
+                if (points >= 0.5) return 'D';     // Midpoint (1.0 + 0.0) / 2
+                return 'F';
+            }
+        });
+    </script>
+</body>
+</html>
